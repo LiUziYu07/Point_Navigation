@@ -1,0 +1,5 @@
+# ninja log v6
+24	2211	7502417586366572	D:/Grounded-Segment-Anything/GroundingDINO/build/temp.win-amd64-cpython-38/Release/Grounded-Segment-Anything/GroundingDINO/groundingdino/models/GroundingDINO/csrc/cuda_version.obj	d45b59f2a91bfd5c
+8	4717	7502417586196591	D:/Grounded-Segment-Anything/GroundingDINO/build/temp.win-amd64-cpython-38/Release/Grounded-Segment-Anything/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cpu.obj	77d0192856e29c5
+29	10140	7502417586406569	D:/Grounded-Segment-Anything/GroundingDINO/build/temp.win-amd64-cpython-38/Release/Grounded-Segment-Anything/GroundingDINO/groundingdino/models/GroundingDINO/csrc/vision.obj	e794b60331019c39
+19	14608	7502417586306728	D:/Grounded-Segment-Anything/GroundingDINO/build/temp.win-amd64-cpython-38/Release/Grounded-Segment-Anything/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cuda.obj	d449da81ecd2df1f
