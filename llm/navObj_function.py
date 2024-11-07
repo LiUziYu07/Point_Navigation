@@ -29,62 +29,6 @@ class ToolBase:
         pass
 
 
-# class ToolDepthEstimate(ToolBase):
-#     def __init__(self):
-#         pass
-
-#     def parser(self, args_str):
-#         try:
-#             args = json.loads(args_str)
-#         except ValueError:
-#             raise Exception("the arguments '{}' is not a json string".format(args_str))
-
-#         if "landmark" not in args:
-#             raise Exception("'landmark' key is missing in the arguments.")
-
-#         return args.get("landmark")
-
-#     def execute(self, task: Task, args_str: str):
-#         landmark = self.parser(args_str)
-#         msgs = []
-#         # 下载数据
-#         remote_dirs = [
-#             ROS_IMAGE_PTH,
-#             ROS_PCD_PTH,
-#             ROS_JSON_PTH
-#         ]
-#         local_base_dir = 'D:\CEG5003_PointNav\data\obs'
-
-#         # 执行下载和删除子文件夹和文件
-#         download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
-#         try:
-#             idx, coords = run_depth_service(landmark)
-#             msgs.append(f"{idx}: {coords}")
-#         except Exception as e:
-#             msgs.append(f"In depth estimation: {e}")
-
-#         return msgs
-
-#     def get_description(self):
-#         return {
-#             "type": "function",
-#             "function": {
-#                 "name": "depth_estimate",
-#                 "description": "This `depth_estimate` function represents detecting the surroundings of a specific object.",
-#                 "parameters": {
-#                     "type": "object",
-#                     "properties": {
-#                         "landmark": {
-#                             "type": "string",
-#                             "description": "`landmark` represents the object for which surroundings are to be detected",
-#                         }
-#                     },
-#                     "required": ["landmark"],
-#                 },
-#             },
-#         }
-
-
 class ToolSurroundingDetect(ToolBase):
     def parser(self, args_str):
         """
@@ -105,14 +49,13 @@ class ToolSurroundingDetect(ToolBase):
         except ValueError:
             raise Exception("the arguments '{}' is not a json string".format(args_str))
 
-        if "rotate_degree" not in args:
-            raise Exception("'rotate_degree' key is missing in the arguments.")
-        rotate_degree = args.get("rotate_degree")
+        if "landmark" not in args:
+            raise Exception("'landmark' key is missing in the arguments.")
 
-        return rotate_degree
+        return args.get("landmark")
 
     def execute(self, task: PointNav, args_str: str):
-        rotate_degree = self.parser(args_str)
+        landmark = self.parser(args_str)
 
         msgs = ""
         cur_x, cur_y, _ = task.cur_node.coordinates
@@ -126,11 +69,10 @@ class ToolSurroundingDetect(ToolBase):
                 "rotate_degree": new_pose % 360
             }
 
-            print(f"new_pose: {new_pose % 360}")
             nav_response = send_post_request("navigate", nav_data)
             if nav_response.status_code == 200:
                 if "success" in nav_response.text.lower():
-                    msgs += f"I have success rotate at the current location with pose {new_pose % 360}"
+                    msgs += f"I have success rotate at the current location with pose {new_pose % 360}."
                 task.cur_node.update_pose(new_pose)
             else:
                 msgs += f"In rotate: {nav_response.text}"
@@ -158,9 +100,10 @@ class ToolSurroundingDetect(ToolBase):
             download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
             try:
                 idx, coords = run_depth_service(landmark)
-                msgs.append(f"{idx}: {coords}")
+                msgs += f"landmark median point in lidar coordinates x: {coords[0]}, y: {coords[1]}, z: {coords[2]}."
+                break
             except Exception as e:
-                msgs.append(f"In depth estimation: {e}")
+                msgs += f"In depth estimation: {e}"
 
         if msgs != "":
             return msgs
@@ -190,7 +133,7 @@ class ToolSurroundingDetect(ToolBase):
 
 class ToolInterestpointGet(ToolBase):
     def __init__(self):
-        self.threshold = 1
+        self.threshold = 1.5
 
     def parser(self, args_str):
         try:
@@ -343,7 +286,6 @@ class ToolNavigate(ToolBase):
             "goal_z": "0",
             "rotate_degree": new_pose
         }
-        print(f"new_pose: {new_pose}")
         nav_response = send_post_request("navigate", nav_data)
 
         msgs = nav_response.text
@@ -397,153 +339,36 @@ class ToolNavigate(ToolBase):
 
 if __name__ == "__main__":
     task_id = uuid.uuid4()
-
     episode = init_pointNavTask(task_id, "ObjPointNav_trial_1", "INIT", "",
                                 coordinates, node_infos, connection_matrix, uuid2timestamp)
     episode.test()
 
-    landmark = "cabinet"
-    print(f"Trying to find a landmark: {landmark}")
-    point_x, point_y, point_z = None, None, None
-    for i in range(0, 5):
-        if i == 0:
-            degree = 0
-        else:
-            degree = 90
+    landmarks = ["cabinet", "green bag", "Stop Sign"]
+    for landmark in landmarks:
+        print(f"Trying to find a landmark: {landmark}")
+        point_x, point_y, point_z = None, None, None
         surrounding_detect = ToolSurroundingDetect()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
+        surrounding_msgs = surrounding_detect.execute(episode, f'{{"landmark": {json.dumps(landmark)}}}')
         try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            print(f"Depth Msgs: {depth_msgs}")
+            print(f"Surrounding Msgs: {surrounding_msgs}")
 
-            coordinates = re.findall(r"-?\d+\.\d+", str(depth_msgs))
+            coordinates = re.findall(r"-?\d+\.\d+", str(surrounding_msgs))
             point_x, point_y, point_z = map(float, coordinates)
-            break
         except Exception as e:
             print(e)
 
-    if point_x and point_y:
-        interestpoint_get = ToolInterestpointGet()
-        next_point_interest = interestpoint_get.execute(episode,
-                                                        f'{{"landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
+        if point_x and point_y:
+            interestpoint_get = ToolInterestpointGet()
+            next_point_interest = interestpoint_get.execute(episode,
+                                                            f'{{"landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
 
-        print(f"interest point: {next_point_interest}")
-        matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', next_point_interest)
-        if matches:
-            point_x, point_y, point_z = matches[0]
-        else:
-            print("Unmatch Informatinon msgs")
+            print(f"interest point: {next_point_interest}")
+            matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', next_point_interest)
+            if matches:
+                point_x, point_y, point_z = matches[0]
+            else:
+                print("Unmatch Informatinon msgs")
 
-        print(point_x, point_y)
-        navi = ToolNavigate()
-        navi.execute(episode, f'{{"coord_x": "{point_x}", "coord_y": "{point_y}", "rotate_degree": 90}}')
-
-    landmark = "green bag"
-    print(f"Trying to find a landmark: {landmark}")
-    point_x, point_y, point_z = None, None, None
-    for i in range(0, 5):
-        if i == 0:
-            degree = 0
-        else:
-            degree = 90
-        surrounding_detect = ToolSurroundingDetect()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            print(f"Depth Msgs: {depth_msgs[0]}")
-
-            coordinates = re.findall(r"-?\d+\.\d+", str(depth_msgs))
-            point_x, point_y, point_z = map(float, coordinates)
-            break
-        except Exception as e:
-            print(e)
-
-    if point_x and point_y:
-        interestpoint_get = ToolInterestpointGet()
-        next_point_interest = interestpoint_get.execute(episode,
-                                                        f'{{"landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
-
-        print(f"interest point: {next_point_interest}")
-        matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', next_point_interest)
-        if matches:
-            point_x, point_y, point_z = matches[0]
-        else:
-            print("Unmatch Informatinon msgs")
-
-        print(point_x, point_y)
-        navi = ToolNavigate()
-        navi.execute(episode, f'{{"coord_x": "{point_x}", "coord_y": "{point_y}", "rotate_degree": 90}}')
-
-    landmark = "Stop Sign"
-    point_x, point_y, point_z = None, None, None
-    for i in range(0, 5):
-        if i == 0:
-            degree = 0
-        else:
-            degree = 90
-        surrounding_detect = ToolSurroundingDetect()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            print(f"Depth Msgs: {depth_msgs[0]}")
-
-            coordinates = re.findall(r"-?\d+\.\d+", str(depth_msgs))
-            point_x, point_y, point_z = map(float, coordinates)
-            break
-        except Exception as e:
-            print(e)
-
-    if point_x and point_y:
-        interestpoint_get = ToolInterestpointGet()
-        next_point_interest = interestpoint_get.execute(episode,
-                                                        f'{{"landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
-
-        print(f"interest point: {next_point_interest}")
-        matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', next_point_interest)
-        if matches:
-            point_x, point_y, point_z = matches[0]
-        else:
-            print("Unmatch Informatinon msgs")
-
-        print(point_x, point_y)
-        navi = ToolNavigate()
-        navi.execute(episode, f'{{"coord_x": "{point_x}", "coord_y": "{point_y}", "rotate_degree": 90}}')
-
-    landmark = "door"
-    point_x, point_y, point_z = None, None, None
-    for i in range(0, 5):
-        if i == 0:
-            degree = 0
-        else:
-            degree = 90
-        surrounding_detect = ToolSurroundingDetect()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            print(f"Depth Msgs: {depth_msgs[0]}")
-
-            coordinates = re.findall(r"-?\d+\.\d+", str(depth_msgs))
-            point_x, point_y, point_z = map(float, coordinates)
-            break
-        except Exception as e:
-            print(e)
-
-    if point_x and point_y:
-        interestpoint_get = ToolInterestpointGet()
-        next_point_interest = interestpoint_get.execute(episode,
-                                                        f'{{"landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
-
-        print(f"interest point: {next_point_interest}")
-        matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', next_point_interest)
-        if matches:
-            point_x, point_y, point_z = matches[0]
-        else:
-            print("Unmatch Informatinon msgs")
-
-        print(point_x, point_y)
-        navi = ToolNavigate()
-        navi.execute(episode, f'{{"coord_x": "{point_x}", "coord_y": "{point_y}", "rotate_degree": 90}}')
+            print(point_x, point_y)
+            navi = ToolNavigate()
+            navi.execute(episode, f'{{"coord_x": "{point_x}", "coord_y": "{point_y}", "rotate_degree": 90}}')
