@@ -29,63 +29,63 @@ class ToolBase:
         pass
 
 
-class ToolDepthEstimate(ToolBase):
-    def __init__(self):
-        pass
+# class ToolDepthEstimate(ToolBase):
+#     def __init__(self):
+#         pass
 
-    def parser(self, args_str):
-        try:
-            args = json.loads(args_str)
-        except ValueError:
-            raise Exception("the arguments '{}' is not a json string".format(args_str))
+#     def parser(self, args_str):
+#         try:
+#             args = json.loads(args_str)
+#         except ValueError:
+#             raise Exception("the arguments '{}' is not a json string".format(args_str))
 
-        if "landmark" not in args:
-            raise Exception("'landmark' key is missing in the arguments.")
+#         if "landmark" not in args:
+#             raise Exception("'landmark' key is missing in the arguments.")
 
-        return args.get("landmark")
+#         return args.get("landmark")
 
-    def execute(self, task: Task, args_str: str):
-        landmark = self.parser(args_str)
-        msgs = []
-        # 下载数据
-        remote_dirs = [
-            ROS_IMAGE_PTH,
-            ROS_PCD_PTH,
-            ROS_JSON_PTH
-        ]
-        local_base_dir = 'D:\CEG5003_PointNav\data\obs'
+#     def execute(self, task: Task, args_str: str):
+#         landmark = self.parser(args_str)
+#         msgs = []
+#         # 下载数据
+#         remote_dirs = [
+#             ROS_IMAGE_PTH,
+#             ROS_PCD_PTH,
+#             ROS_JSON_PTH
+#         ]
+#         local_base_dir = 'D:\CEG5003_PointNav\data\obs'
 
-        # 执行下载和删除子文件夹和文件
-        download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
-        try:
-            idx, coords = run_depth_service(landmark)
-            msgs.append(f"{idx}: {coords}")
-        except Exception as e:
-            msgs.append(f"Error in depth estimation: {e}")
+#         # 执行下载和删除子文件夹和文件
+#         download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
+#         try:
+#             idx, coords = run_depth_service(landmark)
+#             msgs.append(f"{idx}: {coords}")
+#         except Exception as e:
+#             msgs.append(f"In depth estimation: {e}")
 
-        return msgs
+#         return msgs
 
-    def get_description(self):
-        return {
-            "type": "function",
-            "function": {
-                "name": "depth_estimate",
-                "description": "This `depth_estimate` function represents detecting the surroundings of a specific object.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "landmark": {
-                            "type": "string",
-                            "description": "`landmark` represents the object for which surroundings are to be detected",
-                        }
-                    },
-                    "required": ["landmark"],
-                },
-            },
-        }
+#     def get_description(self):
+#         return {
+#             "type": "function",
+#             "function": {
+#                 "name": "depth_estimate",
+#                 "description": "This `depth_estimate` function represents detecting the surroundings of a specific object.",
+#                 "parameters": {
+#                     "type": "object",
+#                     "properties": {
+#                         "landmark": {
+#                             "type": "string",
+#                             "description": "`landmark` represents the object for which surroundings are to be detected",
+#                         }
+#                     },
+#                     "required": ["landmark"],
+#                 },
+#             },
+#         }
 
 
-class ToolSurroundingCapture(ToolBase):
+class ToolSurroundingDetect(ToolBase):
     def parser(self, args_str):
         """
             解析输入参数字符串，并返回所需的参数值。
@@ -116,53 +116,73 @@ class ToolSurroundingCapture(ToolBase):
 
         msgs = ""
         cur_x, cur_y, _ = task.cur_node.coordinates
-        new_pose = task.cur_node.pose + rotate_degree
-        nav_data = {
-            "goal_x": str(cur_x),
-            "goal_y": str(cur_y),
-            "goal_z": "0",
-            "rotate_degree": new_pose % 360
-        }
+        for degree in [0, 90, 90, 90, 90]:
+            msgs = ""
+            new_pose = task.cur_node.pose + degree
+            nav_data = {
+                "goal_x": str(cur_x),
+                "goal_y": str(cur_y),
+                "goal_z": "0",
+                "rotate_degree": new_pose % 360
+            }
 
-        print(f"new_pose: {new_pose % 360}")
-        nav_response = send_post_request("navigate", nav_data)
-        if nav_response.status_code == 200:
-            if "success" in nav_response.text.lower():
-                msgs += f"I have success rotate at the current location with pose {new_pose % 360}"
-            task.cur_node.update_pose(new_pose)
+            print(f"new_pose: {new_pose % 360}")
+            nav_response = send_post_request("navigate", nav_data)
+            if nav_response.status_code == 200:
+                if "success" in nav_response.text.lower():
+                    msgs += f"I have success rotate at the current location with pose {new_pose % 360}"
+                task.cur_node.update_pose(new_pose)
+            else:
+                msgs += f"In rotate: {nav_response.text}"
+
+            camera_data = {
+                "camera_names": ["front"],
+                "analyzers": "manual"
+            }
+
+            camera_response = send_post_request("camera", camera_data)
+            if camera_response.status_code == 200:
+                pass
+            else:
+                msgs += f"In camera: {camera_response.text}"
+            
+            # 下载数据
+            remote_dirs = [
+                ROS_IMAGE_PTH,
+                ROS_PCD_PTH,
+                ROS_JSON_PTH
+            ]
+            local_base_dir = 'D:\CEG5003_PointNav\data\obs'
+
+            # 执行下载和删除子文件夹和文件
+            download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
+            try:
+                idx, coords = run_depth_service(landmark)
+                msgs.append(f"{idx}: {coords}")
+            except Exception as e:
+                msgs.append(f"In depth estimation: {e}")
+
+        if msgs != "":
+            return msgs
         else:
-            msgs += f"Error in navigation: {nav_response.text}"
-
-        camera_data = {
-            "camera_names": ["front"],
-            "analyzers": "manual"
-        }
-
-        camera_response = send_post_request("camera", camera_data)
-        if camera_response.status_code == 200:
-            pass
-        else:
-            msgs += f"Error in when capturing: {camera_response.text}"
-
-        return msgs
+            return "I cannot find the landmark"
 
     def get_description(self):
         return {
             "type": "function",
             "function": {
-                "name": "surround_capture",
-                "description": "This `surround_capture` function represents detecting the surroundings of a "
+                "name": "surround_detect",
+                "description": "This `surround_detect` function represents detecting the surroundings of a "
                                "specific object.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "rotate_degree": {
+                        "landmark": {
                             "type": "string",
-                            "description": "The `rotate_degree` parameter indicates the desired rotation angle from "
-                                           "the robot's current pose, ranging between -360 and 360 degrees.",
+                            "description": "`landmark` represents the object for which surroundings are to be detected",
                         }
                     },
-                    "required": ["rotate_degree"],
+                    "required": ["landmark"],
                 },
             },
         }
@@ -390,7 +410,7 @@ if __name__ == "__main__":
             degree = 0
         else:
             degree = 90
-        surrounding_detect = ToolSurroundingCapture()
+        surrounding_detect = ToolSurroundingDetect()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
         try:
             depth_estimate = ToolDepthEstimate()
@@ -427,7 +447,7 @@ if __name__ == "__main__":
             degree = 0
         else:
             degree = 90
-        surrounding_detect = ToolSurroundingCapture()
+        surrounding_detect = ToolSurroundingDetect()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
         try:
             depth_estimate = ToolDepthEstimate()
@@ -463,7 +483,7 @@ if __name__ == "__main__":
             degree = 0
         else:
             degree = 90
-        surrounding_detect = ToolSurroundingCapture()
+        surrounding_detect = ToolSurroundingDetect()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
         try:
             depth_estimate = ToolDepthEstimate()
@@ -499,7 +519,7 @@ if __name__ == "__main__":
             degree = 0
         else:
             degree = 90
-        surrounding_detect = ToolSurroundingCapture()
+        surrounding_detect = ToolSurroundingDetect()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
         try:
             depth_estimate = ToolDepthEstimate()

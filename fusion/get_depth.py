@@ -209,7 +209,7 @@ def run(landmark):
     move_subfolders(OUTPUT_SRC, OUTDATED_FOLDER)
     move_subfolders(OBS_CONFIG_PTH, OUTDATED_FOLDER)
     if not landmark_depth:
-        raise ValueError(f"Error: landmark_depth list is empty. No {landmark} depth information found.")
+        raise ValueError(f"landmark_depth list is empty. No {landmark} depth information found.")
     min_index, (x, y, z) = min(enumerate(landmark_depth), key=lambda t: t[1][0] ** 2 + t[1][1] ** 2 + t[1][2] ** 2)
     return min_index, (round(x, 3), round(y, 3), round(z, 3))
 

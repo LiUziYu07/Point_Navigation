@@ -28,7 +28,7 @@ class ToolBase:
         pass
 
 
-class ToolDepthEstimate(ToolBase):
+class ToolSurroundingDetect(ToolBase):
     def __init__(self):
         pass
 
@@ -46,37 +46,72 @@ class ToolDepthEstimate(ToolBase):
     def execute(self, task: Task, args_str: str):
         landmark = self.parser(args_str)
         msgs = ""
-        # 下载数据
-        remote_dirs = [
-            ROS_IMAGE_PTH,
-            ROS_PCD_PTH,
-            ROS_JSON_PTH
-        ]
-        local_base_dir = 'D:\CEG5003_PointNav\data\obs'
 
-        # 执行下载和删除子文件夹和文件
-        download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
-        try:
-            idx, coords = run_depth_service(landmark)
-            depth_data = {
-                "point_x": coords[0],
-                "point_y": coords[1],
-                "point_z": 0,
+        # Rotate and capture surroundings
+        cur_x, cur_y, _ = task.cur_node.coordinates
+        for degree in [0, 90, 90, 90, 90]:
+            msgs = ""
+            new_pose = task.cur_node.pose + degree
+            nav_data = {
+                "goal_x": str(cur_x),
+                "goal_y": str(cur_y),
+                "goal_z": "0",
+                "rotate_degree": new_pose % 360
             }
-            transform_response = send_post_request("transform", depth_data)
-            print(f"Point on the map: {transform_response.text}")
-            msgs = transform_response.text
-        except Exception as e:
-            msgs += f"Error in depth estimation: {e}"
 
-        return msgs
+            nav_response = send_post_request("navigate", nav_data)
+            if nav_response.status_code == 200:
+                if "success" in nav_response.text.lower():
+                    msgs += f"I have success rotate at the current location with pose {new_pose % 360}\n"
+                task.cur_node.update_pose(new_pose)
+            else:
+                msgs += f"Error in navigation: {nav_response.text}\n"
+
+            camera_data = {
+                "camera_names": ["front"],
+                "analyzers": "manual"
+            }
+
+            camera_response = send_post_request("camera", camera_data)
+            if camera_response.status_code == 200:
+                pass
+            else:
+                msgs += f"Error in when capturing: {camera_response.text}\n"
+
+            # Depth estimation
+            remote_dirs = [
+                ROS_IMAGE_PTH,
+                ROS_PCD_PTH,
+                ROS_JSON_PTH
+            ]
+            local_base_dir = 'D:\CEG5003_PointNav\data\obs'
+    
+            download_folders(ROS_IP, 22, ROS_HOST_NAME, remote_dirs, local_base_dir)
+            try:
+                idx, coords = run_depth_service(landmark)
+                depth_data = {
+                    "point_x": coords[0],
+                    "point_y": coords[1],
+                    "point_z": 0,
+                }
+                transform_response = send_post_request("transform", depth_data)
+                print(f"Point on the map: {transform_response.text}")
+                msgs += transform_response.text
+                break
+            except Exception as e:
+                msgs += f"In depth estimation: {e}"
+        
+        if msgs != "":
+            return msgs
+        else:
+            return "I cannot find the landmark"
 
     def get_description(self):
         return {
             "type": "function",
             "function": {
-                "name": "depth_estimate",
-                "description": "This `depth_estimate` function represents detecting the surroundings of a specific object.",
+                "name": "surrounding_detect",
+                "description": "This `surrounding_detect` function represents detecting the surroundings of a specific object and estimating its depth.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -86,93 +121,6 @@ class ToolDepthEstimate(ToolBase):
                         }
                     },
                     "required": ["landmark"],
-                },
-            },
-        }
-
-
-class ToolSurroundingCapture(ToolBase):
-    def parser(self, args_str):
-        """
-            解析输入参数字符串，并返回所需的参数值。
-
-            参数:
-            - args_str (str): JSON格式的字符串，包含导航参数。
-
-            返回值:
-            - tuple: 包含起点、终点、旋转类型和旋转角度的元组。
-
-            异常处理:
-            - 如果参数字符串不是JSON格式，抛出异常。
-            - 如果缺少必需的参数，抛出异常。
-        """
-        try:
-            args = json.loads(args_str)
-        except ValueError:
-            raise Exception("the arguments '{}' is not a json string".format(args_str))
-
-        if "rotate_degree" not in args:
-            raise Exception("'rotate_degree' key is missing in the arguments.")
-        rotate_degree = args.get("rotate_degree")
-        
-        try:
-            rotate_degree = float(rotate_degree)
-        except ValueError:
-            raise Exception("'rotate_degree' value '{}' cannot be converted to a float.".format(rotate_degree))
-
-        return rotate_degree
-
-    def execute(self, task: PointNav, args_str: str):
-        rotate_degree = self.parser(args_str)
-
-        msgs = ""
-        cur_x, cur_y, _ = task.cur_node.coordinates
-        new_pose = task.cur_node.pose + rotate_degree
-        nav_data = {
-            "goal_x": str(cur_x),
-            "goal_y": str(cur_y),
-            "goal_z": "0",
-            "rotate_degree": new_pose % 360
-        }
-
-        nav_response = send_post_request("navigate", nav_data)
-        if nav_response.status_code == 200:
-            if "success" in nav_response.text.lower():
-                msgs += f"I have success rotate at the current location with pose {new_pose % 360}"
-            task.cur_node.update_pose(new_pose)
-        else:
-            msgs += f"Error in navigation: {nav_response.text}"
-
-        camera_data = {
-            "camera_names": ["front"],
-            "analyzers": "manual"
-        }
-
-        camera_response = send_post_request("camera", camera_data)
-        if camera_response.status_code == 200:
-            pass
-        else:
-            msgs += f"Error in when capturing: {camera_response.text}"
-
-        return msgs
-
-    def get_description(self):
-        return {
-            "type": "function",
-            "function": {
-                "name": "surrounding_capture",
-                "description": "This `surrounding_capture` function represents detecting the surroundings of a "
-                               "specific object.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "rotate_degree": {
-                            "type": "string",
-                            "description": "The `rotate_degree` parameter indicates the desired rotation angle from "
-                                           "the robot's current pose, ranging between -360 and 360 degrees.",
-                        }
-                    },
-                    "required": ["rotate_degree"],
                 },
             },
         }
@@ -225,18 +173,27 @@ class ToolViewpointGet(ToolBase):
             desc_embedding = text_embedding.encode(str(info["description"]).replace("{", "").replace("}", ""))
 
             simularity_dict[info["viewpoint_id"]] = cos_simularity(landmark_embedding, desc_embedding)
-            # 第一种方法
+
             if dist > (coord_y - next_y) ** 2 + (coord_x - next_x) ** 2:
                 dist = (coord_y - next_y) ** 2 + (coord_x - next_x) ** 2
                 next_viewpoint = info
+                
+        # Check if the new viewpoint is closer to the current node's coordinates
+        cur_x, cur_y, _ = task.cur_node.coordinates
+        new_x, new_y, _ = next_viewpoint["coordinates"]
 
+        current_distance = (coord_x - cur_x) ** 2 + (coord_y - cur_y) ** 2
+
+        if dist >= current_distance:
+            raise Exception("The new viewpoint is not closer to the target than the current node. The task is completed!")
+        
         if next_viewpoint is None:
             raise Exception("No accessible viewpoint found.")
 
         max_key, max_value = max(simularity_dict.items(), key=lambda x: x[1])
         print("Max Cos Similarity viewpoint:", max_key)
 
-        msg = f"The optimal viewpoint {next_viewpoint['viewpoint_id']}"
+        msg = f"The optimal viewpoint: {next_viewpoint['viewpoint_id']}"
         return msg
 
     def get_description(self):
@@ -443,97 +400,44 @@ if __name__ == "__main__":
     # landmark = "green bag"
     landmark = "cabinet"
     point_x, point_y, point_z = None, None, None
-    for i in range(0, 5):
-        if i == 0:
-            degree = 0
+    surrounding_detect = ToolSurroundingDetect()
+    surrounding_msgs = surrounding_detect.execute(episode, f'{{"landmark": "{landmark}"}}')
+    print(f"Surrounding_detect msgs: {surrounding_msgs}")
+    try:
+        matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', surrounding_msgs)
+        print(f"Depth msgs: {surrounding_msgs}")
+        if matches:
+            point_x, point_y, point_z = matches[0]
         else:
-            degree = 90
-        surrounding_detect = ToolSurroundingCapture()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
-        print(f"Surrounding msgs: {surrounding_msgs}")
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', depth_msgs)
-            print(f"Depth msgs: {depth_msgs}")
-            if matches:
-                point_x, point_y, point_z = matches[0]
-                break
-            else:
-                print("Unmatch Informatinon msgs")
-        except Exception as e:
-            print(e)
+            print("Unmatch Informatinon msgs")
+    except Exception as e:
+        print(e)
 
     viewpoint_get = ToolViewpointGet()
     next_viewpoint_msg = viewpoint_get.execute(episode,
                                            f'{{"viewpoint_id": "{episode.cur_node.node_id}", "landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
 
-    print(next_viewpoint_msg)
     navi = ToolNavigate()
-    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg}", "rotate_degree": 90}}')
+    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg.replace("The optimal viewpoint:", "").strip()}", "rotate_degree": 0}}')
 
-    for i in range(0, 5):
-        surrounding_detect = ToolSurroundingCapture()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {90}}}')
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', depth_msgs)
-            print(f"Depth msgs: {depth_msgs}")
-            if matches:
-                point_x, point_y, point_z = matches[0]
-                break
-            else:
-                print("Unmatch Informatinon msgs")
-        except Exception as e:
-            print(e)
-
-    # landmark = "blue garbagecan"
-    # landmark = "green bag"
-    landmark = "Wooden box"
+    landmark = "green bag"
     point_x, point_y, point_z = None, None, None
-    for i in range(0, 5):
-        if i == 0:
-            degree = 0
+    surrounding_detect = ToolSurroundingDetect()
+    surrounding_msgs = surrounding_detect.execute(episode, f'{{"landmark": "{landmark}"}}')
+    try:
+        matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', surrounding_msgs)
+        print(f"Depth msgs: {surrounding_msgs}")
+        if matches:
+            point_x, point_y, point_z = matches[0]
         else:
-            degree = 90
-        surrounding_detect = ToolSurroundingCapture()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
-        print(f"Surrounding msgs: {surrounding_msgs}")
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', depth_msgs)
-            print(f"Depth msgs: {depth_msgs}")
-            if matches:
-                point_x, point_y, point_z = matches[0]
-                break
-            else:
-                print("Unmatch Informatinon msgs")
-        except Exception as e:
-            print(e)
+            print("Unmatch Informatinon msgs")
+    except Exception as e:
+        print(e)
 
     viewpoint_get = ToolViewpointGet()
     next_viewpoint_msg = viewpoint_get.execute(episode,
-                                           f'{{"viewpoint_id": "{episode.cur_node.node_id}", "landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
+                                               f'{{"viewpoint_id": "{episode.cur_node.node_id}", "landmark": "{landmark}", "coord_x": {point_x}, "coord_y": {point_y}}}')
 
-    print(f"Next points: {next_viewpoint_msg}")
-    print(episode.viewpoints)
     navi = ToolNavigate()
-    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg}", "rotate_degree": 90}}')
-
-    for i in range(0, 5):
-        surrounding_detect = ToolSurroundingCapture()
-        surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {90}}}')
-        try:
-            depth_estimate = ToolDepthEstimate()
-            depth_msgs = depth_estimate.execute(episode, f'{{"landmark": "{landmark}"}}')
-            matches = re.findall(r'x=(-?[0-9.]+), y=(-?[0-9.]+), z=(-?[0-9.]+)', depth_msgs)
-            print(f"Depth msgs: {depth_msgs}")
-            if matches:
-                point_x, point_y, point_z = matches[0]
-                break
-            else:
-                print("Unmatch Informatinon msgs")
-        except Exception as e:
-            print(e)
+    navi.execute(episode,
+                 f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg.replace("The optimal viewpoint:", "").strip()}", "rotate_degree": 0}}')

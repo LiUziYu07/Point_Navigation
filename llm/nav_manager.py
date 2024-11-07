@@ -1,4 +1,4 @@
-from navPoint_function import ToolNavigate as PointNavigate, ToolViewpointGet, ToolSurroundingCapture, ToolDepthEstimate
+from navPoint_function import ToolNavigate as PointNavigate, ToolViewpointGet, ToolSurroundingDetect
 from core.task import PointNav
 from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 
@@ -12,10 +12,9 @@ class ToolManager:
     def generate_tools_dict(self):
         # 根据 task_type 生成工具字典
         tools = {
-            'surrounding_capture': ToolSurroundingCapture(),
+            'surrounding_detect': ToolSurroundingDetect(),
             'navigate': PointNavigate(),
             'viewpoint_get': ToolViewpointGet(),
-            'depth_estimate': ToolDepthEstimate(),
         }
         self.tool_dict = tools
 

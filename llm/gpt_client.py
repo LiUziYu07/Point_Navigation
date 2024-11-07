@@ -18,7 +18,10 @@ class GPTClient():
         self.sys_msgs = sys_msgs
         self.tool_manager = ToolManager(self.task_type)
 
-    def update_task_message(self, task_description):
+    def update_task_message(self, current_msg):
+        self.add_message("system", "Your current position: {}".format(current_msg))
+
+    def reset_task_message(self, task_description):
         self.task_description = task_description
         self.reset_messages()
 
@@ -69,6 +72,8 @@ class GPTClient():
                     function_name = tool_call.function.name
                     function_args = tool_call.function.arguments
                     function_response = self.tool_manager.execute(tool_name=function_name, tool_args=function_args, task=self.task)
+                    # if "navigate" in function_name:
+                    #     self.update_task_message(function_response)
                     print(
                         "robot call tools id {}\nfunc: {}\nargs: {}\nresp: {}".format(
                             tool_call.id,
@@ -87,8 +92,10 @@ class GPTClient():
                     ),
                     end="\n\n",
                 )
+            return response
         except Exception as e:
             print("Error: {}\nmessages: {}".format(e, self.messages))
+            return e
 
     def reset_messages(self):
         self.messages = []
@@ -100,12 +107,12 @@ class GPTClient():
         feedback = ""
         while task != "exit" and feedback != "exit":
             # task = input("Your task: ")
-            task = "go to the cabinet and try to find a green bag, after that you should get there"
-            self.update_task_message(task + f"\nYour current point id is:\t{self.task.cur_node.node_id}")
+            task = "go to the cabinet and try to find a green bag, after that you should get there and take photos."
+            self.reset_task_message(task + f"\nYour current point id is:\t{self.task.cur_node.node_id}")
             while task != "exit" and feedback != "exit":
-                self.execute()
+                response = self.execute()
                 feedback = input("Whether or not to continue? (y/n): ")
-                if feedback == "n":
+                if feedback == "n" or 'exit' in response:
                     print("session reset")
                     break
             break
@@ -120,4 +127,3 @@ if __name__ == "__main__":
     episode.test()
     client = GPTClient(task=episode, task_type=task_type, model=GPT_MODEL, sys_msgs=SYSTEM_PRINCIPLE)
     client.test()
-
