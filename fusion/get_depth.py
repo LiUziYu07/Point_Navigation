@@ -125,6 +125,14 @@ def get_depth(**kwargs):
                 target_pts.append(point)
 
         target_pts = np.array(target_pts)
+        if len(target_pts) > 0:
+            mean = np.mean(target_pts, axis=0)
+            std_dev = np.std(target_pts, axis=0)
+            print(f"Variance before removing outliers: {np.var(target_pts, axis=0)}")
+            filtered_pts = [pt for pt in target_pts if np.all(np.abs(pt - mean) <= 2 * std_dev)]
+            filtered_pts = np.array(filtered_pts)
+            print(f"Variance after removing outliers: {np.var(filtered_pts, axis=0)}")
+            target_pts = np.array(filtered_pts)
         depth = np.mean(target_pts, axis=0)
 
     return depth

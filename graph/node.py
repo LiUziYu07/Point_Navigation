@@ -26,7 +26,7 @@ class Node:
         self.coordinates = coordinates
 
     def __repr__(self):
-        return f"Node({self.node_id}, Coordinates: {self.coordinates}, Description: {self.description})"
+        return f"Node(Node_id: {self.node_id}, Coordinates: {self.coordinates}, Description: {self.description})"
 
 
 class Map:

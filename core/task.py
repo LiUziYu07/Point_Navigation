@@ -1,6 +1,6 @@
 from graph.node import Node, Map
-from core.actions import generate_action_space, generate_viewpoints
-from config.nav_node_info import coordinates, node_infos, connection_matrix, uid2timestamp
+from core.actions import generate_action_space
+from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 from config.api import MODEL
 from enum import Enum
 
@@ -29,15 +29,16 @@ class Task:
 
 
 class PointNav(Task):
-    def __init__(self, task_id, description, instructions, status, coordinates, node_infos, connection_matrix):
+    def __init__(self, task_id, description, instructions, status, coordinates, node_infos, connection_matrix, uuid2timestamp):
         super().__init__(task_id, description, status)
-        self.uuid2timestamp, self.timestamp2uuid = uid2timestamp()
         self.coordinates = coordinates
         self.node_infos = node_infos
         self.instructions = instructions
+        self.uuid2timestamp = uuid2timestamp
+        self.timestamp2uuid = {v: k for k, v in uuid2timestamp.items()}
 
         self.connection_matrix = connection_matrix
-        self.action_space, self.viewpoints = generate_action_space(coordinates, self.timestamp2uuid)
+        self.viewpoints = generate_action_space(coordinates, self.timestamp2uuid)
         self.graph = self.generate_map()
         self.visited_graph = self.generate_visited_map()
         self.cur_node = None
@@ -124,39 +125,21 @@ class PointNav(Task):
 
     def run(self):
         start_viewpoint = next(vp_id for vp_id, coords in self.viewpoints.items() if coords == (0, 0, 0))
-        self.cur_node = start_viewpoint
-        #TODO visited_graph 和 cur_node 初始化
-        self.visited_graph.add_node()
-
-        is_completed = False
-        task_description = ""
-        while task_description != "exit":
-            task_description = input("Your task:")
-            self.update_task_description(task_description)
-            while task_description != "exit":
-                pass
-        #TODO 定义好LLM可以使用的接口
+        self.cur_node = self.graph.get_node(start_viewpoint)
         pass
 
     def test(self):
         start_viewpoint = next(vp_id for vp_id, coords in self.viewpoints.items() if coords == (0, 0, 0))
-        # start_viewpoint = next(vp_id for vp_id, coords in self.viewpoints.items())
         self.cur_node = self.graph.get_node(start_viewpoint)
-        # self.cur_node.update_pose(90)
         self.visited_graph.add_node(self.cur_node)
 
     def __str__(self):
-        return (f"PointNav Task ID: {self.task_id}, Description: {self.description}, Status: {self.status}, Action "
-                f"Space: {self.action_space}, Instructions: {self.instructions}, Viewpoints: {len(self.viewpoints.keys())}")
+        return f"PointNav Task ID: {self.task_id}, Description: {self.description}, Status: {self.status}, Instructions: {self.instructions}, Viewpoints: {len(self.viewpoints.keys())}"
 
 
-def init_pointNavTask(task_id, description, status, instructions, coordinates, node_infos, connection_matrix):
-    episode = PointNav(task_id, description, instructions, status, coordinates, node_infos, connection_matrix)
+def init_pointNavTask(task_id, description, status, instructions, coordinates, node_infos, connection_matrix, uuid2timestamp):
+    episode = PointNav(task_id, description, instructions, status, coordinates, node_infos, connection_matrix, uuid2timestamp)
     return episode
-
-
-def start_episode(episode):
-    pass
 
 
 if __name__ == "__main__":

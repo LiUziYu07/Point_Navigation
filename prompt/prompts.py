@@ -7,8 +7,41 @@ do for me\"}<|eot_id|><|start_header_id|>user<|end_header_id|> Follow my instruc
 kitchen and stop at the fridge<|eot_id|><|start_header_id|>assistant<|end_header_id|> {\"intention\": \"Task\", 
 \"content\": \"go to the kitchen and stop at the fridge\"}<|eot_id|><|start_header_id|>user<|end_header_id|>"""
 
-system_principle = """
-Here are some tips for you to finish point navigation
+SYSTEM_PRINCIPLE = """Here are some tips for you to finish point navigation. Note that only one action is output each 
+time. In this case, landmark refers to a variety of objects such as cabinet, bag, etc. Try to extract the object from 
+the instructions.
+
+When you try to go to the landmark, please capture the surrounding first. When taking pictures of your surroundings, 
+you will only use one camera at a time, so you need to give rotate_degree, The rotation angle should be selected in 
+order 0, 90, 180, 270, 360.
+
+pipeline of the system
+---
+
+**STEP 1**: **surrounding_capture**  
+1.1 Perform `surrounding_capture` at `cur_pose + 0°`.
+   - **depth_estimate**: Immediately attempt to detect the landmark specified in the task description. If the target landmark is detected, calculate the depth (distance) between the LiDAR and the landmark. If a target landmark is found, retrieve its location on the map and proceed directly to **STEP 3**.
+
+1.2 Rotate to `cur_pose + 90°` and perform `surrounding_capture`.
+   - **depth_estimate**: Repeat the detection and depth calculation. If the target is detected, proceed directly to **STEP 3**.
+
+1.3 Rotate to `cur_pose + 180°` and perform `surrounding_capture`.
+   - **depth_estimate**: Perform the detection and depth calculation again. If the target is detected, proceed directly to **STEP 3**.
+
+1.4 Rotate to `cur_pose + 270°` and perform `surrounding_capture`.
+   - **depth_estimate**: Check for landmarks and calculate depth. If the target is detected, proceed directly to **STEP 3**.
+
+**STEP 2**: **Final Check at 360° (if needed)**  
+If no landmark is detected in steps 1.1 to 1.4, perform a final capture at `cur_pose + 360°` to confirm.
+
+**STEP 3**: **viewpoint_get**  
+Using the system’s map and past trajectory, find the closest connected viewpoint ID relative to the current viewpoint, suitable for further navigation.
+
+**STEP 4**: **Navigate to viewpoint**  
+Navigate to the identified viewpoint from **STEP 3**.
+
+---
+
 """
 
 NavPoint_simple_prompt = ''' Instruct: Starting from viewpoint(0915e34d-80cb-4a0a-808a-8c9793e052d2), go out to the door and turn left, forward to the whiteboard and stop at the it.

@@ -21,11 +21,11 @@ def move_subfolders(source_folder, target_folder):
                 for sub_item in os.listdir(item_path):
                     sub_item_path = os.path.join(item_path, sub_item)
                     shutil.move(sub_item_path, target_path)
-                print(f"文件夹 {item} 的内容已合并到 {target_path}。")
+                # print(f"文件夹 {item} 的内容已合并到 {target_path}。")
                 os.rmdir(item_path)  # 删除空的源文件夹
             else:
                 shutil.move(item_path, target_path)
-                print(f"文件夹 {item} 已转移到 {target_folder}。")
+                # print(f"文件夹 {item} 已转移到 {target_folder}。")
 
 
 if __name__ == '__main__':

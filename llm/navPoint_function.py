@@ -1,8 +1,6 @@
 import json
 import uuid
 import re
-from config.data import OBS_CONFIG_PTH, OUTDATED_FOLDER
-from script.delete_data import clear_folder_contents
 from graph.node import Node
 
 import numpy as np
@@ -12,7 +10,7 @@ from download.ssh import download_folders
 from fusion.get_depth import run as run_depth_service
 from core.task import Task, PointNav, init_pointNavTask
 from config.ros import ROS_IP, ROS_PORT, ROS_IMAGE_PTH, ROS_JSON_PTH, ROS_PCD_PTH, ROS_HOST_NAME
-from config.nav_node_info import coordinates, node_infos, connection_matrix
+from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 from utils.robot_requests import send_post_request, url_dict
 
 text_embedding = SentenceTransformer('paraphrase-MiniLM-L6-v2')
@@ -84,7 +82,7 @@ class ToolDepthEstimate(ToolBase):
                     "properties": {
                         "landmark": {
                             "type": "string",
-                            "description": "`landmark` represents the object for which surroundings are to be detected",
+                            "description": "`landmark` represents the object for which surroundings are to be detected, like objects.",
                         }
                     },
                     "required": ["landmark"],
@@ -93,7 +91,7 @@ class ToolDepthEstimate(ToolBase):
         }
 
 
-class ToolSurroundingDetect(ToolBase):
+class ToolSurroundingCapture(ToolBase):
     def parser(self, args_str):
         """
             解析输入参数字符串，并返回所需的参数值。
@@ -116,6 +114,11 @@ class ToolSurroundingDetect(ToolBase):
         if "rotate_degree" not in args:
             raise Exception("'rotate_degree' key is missing in the arguments.")
         rotate_degree = args.get("rotate_degree")
+        
+        try:
+            rotate_degree = float(rotate_degree)
+        except ValueError:
+            raise Exception("'rotate_degree' value '{}' cannot be converted to a float.".format(rotate_degree))
 
         return rotate_degree
 
@@ -157,8 +160,8 @@ class ToolSurroundingDetect(ToolBase):
         return {
             "type": "function",
             "function": {
-                "name": "surrounding_detect",
-                "description": "This `surrounding_detect` function represents detecting the surroundings of a "
+                "name": "surrounding_capture",
+                "description": "This `surrounding_capture` function represents detecting the surroundings of a "
                                "specific object.",
                 "parameters": {
                     "type": "object",
@@ -169,7 +172,7 @@ class ToolSurroundingDetect(ToolBase):
                                            "the robot's current pose, ranging between -360 and 360 degrees.",
                         }
                     },
-                    "required": ["goal_x", "goal_y", "rotate_type", "rotate_degree"],
+                    "required": ["rotate_degree"],
                 },
             },
         }
@@ -190,7 +193,16 @@ class ToolViewpointGet(ToolBase):
             if param not in args:
                 raise Exception("parameter '{}' not found in the arguments {}.".format(param, args))
 
-        return args.get("viewpoint_id"), args.get("landmark"), args.get("coord_x"), args.get("coord_y")
+        coord_x = args.get("coord_x")
+        coord_y = args.get("coord_y")
+
+        try:
+            coord_x = float(coord_x)
+            coord_y = float(coord_y)
+        except ValueError:
+            raise Exception("coord_x and coord_y must be convertible to float.")
+
+        return args.get("viewpoint_id"), args.get("landmark"), coord_x, coord_y
 
     def execute(self, task: Task, args_str: str):
         viewpoint_id, landmark, coord_x, coord_y = self.parser(args_str)
@@ -224,19 +236,17 @@ class ToolViewpointGet(ToolBase):
         max_key, max_value = max(simularity_dict.items(), key=lambda x: x[1])
         print("Max Cos Similarity viewpoint:", max_key)
 
-        return next_viewpoint["viewpoint_id"]
-
-        # return next_viewpoint, task.cur_node.coordinates
+        msg = f"The optimal viewpoint {next_viewpoint['viewpoint_id']}"
+        return msg
 
     def get_description(self):
         return {
             "type": "function",
             "function": {
                 "name": "viewpoint_get",
-                "description": "This `viewpoint_get` function represents get the next accessible viewpoint on the "
-                               "topology map.",
+                "description": "`viewpoint_get` is the method used to query which areas are navigable on the entire node map, generally used after I have known landmark.",
                 "parameters": {
-                    "type": "viewpoint",
+                    "type": "object",
                     "properties": {
                         "viewpoint_id": {
                             "type": "string",
@@ -287,7 +297,7 @@ class ToolNavigate(ToolBase):
         except ValueError:
             raise Exception("the arguments '{}' is not a json string".format(args_str))
 
-        required_params = ["starting_point", "ending_point", "rotate_type", "rotate_degree"]
+        required_params = ["starting_point", "ending_point", "rotate_degree"]
         for param in required_params:
             if param not in args:
                 raise Exception("parameter '{}' not found in the arguments {}.".format(param, args))
@@ -295,9 +305,13 @@ class ToolNavigate(ToolBase):
         starting_point = args.get("starting_point")
         ending_point = args.get("ending_point")
         rotate_degree = args.get("rotate_degree")
-        rotate_type = args.get("rotate_type")
 
-        return starting_point, ending_point, rotate_type, rotate_degree
+        try:
+            rotate_degree = float(rotate_degree)
+        except ValueError:
+            raise Exception(f"rotate_degree '{rotate_degree}' cannot be converted to a float.")
+
+        return starting_point, ending_point, rotate_degree
 
     def validate_args(self, starting_point, ending_point, task_info):
         """
@@ -337,7 +351,7 @@ class ToolNavigate(ToolBase):
            异常处理:
            - 如果请求失败，则抛出异常。
        """
-        starting_point, ending_point, rotate_type, rotate_degree = self.parser(args_str)
+        starting_point, ending_point, rotate_degree = self.parser(args_str)
 
         self.validate_args(starting_point, ending_point, task)
 
@@ -367,10 +381,11 @@ class ToolNavigate(ToolBase):
 
         msgs = nav_response.text
         if nav_response.status_code == 200:
-            new_node = Node(node_id=str(uuid.uuid4()), coordinates=(ep_x, ep_y, 0), description="Node 1 Scene", pose=new_pose)
+            print("***************")
+            new_node = Node(node_id=ending_point, coordinates=(ep_x, ep_y, 0), description="")
             task.visited_graph.add_node(new_node)
             task.cur_node = new_node
-            msgs = "You have successfully navigate to point {}".format(ending_point)
+            msgs = "You have successfully navigate to viewpoint {}".format(ending_point)
         else:
             msgs += "You failed navigate to point {}".format(ending_point)
 
@@ -403,19 +418,13 @@ class ToolNavigate(ToolBase):
                                            "navigation, which is an ID that is used to represent a unique position on "
                                            "the topology map",
                         },
-                        "rotate_type": {
-                            "type": "string",
-                            "description": "The `rotate_type` parameter specifies both whether the robot should "
-                                           "rotate and the direction of rotation.",
-                            "enum": ["NO_CHANGED_POSE", "CHANGE"],
-                        },
                         "rotate_degree": {
                             "type": "string",
                             "description": "The `rotate_degree` parameter indicates the desired rotation angle from "
                                            "the robot's current pose, ranging between -360 and 360 degrees.",
                         }
                     },
-                    "required": ["goal_x", "goal_y", "rotate_type", "rotate_degree"],
+                    "required": ["goal_x", "goal_y", "rotate_degree"],
                 },
             },
         }
@@ -425,7 +434,7 @@ if __name__ == "__main__":
     task_id = uuid.uuid4()
 
     episode = init_pointNavTask(task_id, "Point2PointNav_trial_1", "INIT", "",
-                                coordinates, node_infos, connection_matrix)
+                                coordinates, node_infos, connection_matrix, uuid2timestamp)
     episode.test()
     print(episode.cur_node)
     msgs = []
@@ -439,7 +448,7 @@ if __name__ == "__main__":
             degree = 0
         else:
             degree = 90
-        surrounding_detect = ToolSurroundingDetect()
+        surrounding_detect = ToolSurroundingCapture()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
         print(f"Surrounding msgs: {surrounding_msgs}")
         try:
@@ -461,10 +470,10 @@ if __name__ == "__main__":
 
     print(next_viewpoint_msg)
     navi = ToolNavigate()
-    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg}", "rotate_type": "TURN_LEFT", "rotate_degree": 90}}')
+    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg}", "rotate_degree": 90}}')
 
     for i in range(0, 5):
-        surrounding_detect = ToolSurroundingDetect()
+        surrounding_detect = ToolSurroundingCapture()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {90}}}')
         try:
             depth_estimate = ToolDepthEstimate()
@@ -480,15 +489,15 @@ if __name__ == "__main__":
             print(e)
 
     # landmark = "blue garbagecan"
-    landmark = "green bag"
-    # landmark = "cabinet"
+    # landmark = "green bag"
+    landmark = "Wooden box"
     point_x, point_y, point_z = None, None, None
     for i in range(0, 5):
         if i == 0:
             degree = 0
         else:
             degree = 90
-        surrounding_detect = ToolSurroundingDetect()
+        surrounding_detect = ToolSurroundingCapture()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {degree}}}')
         print(f"Surrounding msgs: {surrounding_msgs}")
         try:
@@ -511,10 +520,10 @@ if __name__ == "__main__":
     print(f"Next points: {next_viewpoint_msg}")
     print(episode.viewpoints)
     navi = ToolNavigate()
-    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg}", "rotate_type": "TURN_LEFT", "rotate_degree": 90}}')
+    navi.execute(episode, f'{{"starting_point": "{episode.cur_node.node_id}", "ending_point": "{next_viewpoint_msg}", "rotate_degree": 90}}')
 
     for i in range(0, 5):
-        surrounding_detect = ToolSurroundingDetect()
+        surrounding_detect = ToolSurroundingCapture()
         surrounding_msgs = surrounding_detect.execute(episode, f'{{"rotate_degree": {90}}}')
         try:
             depth_estimate = ToolDepthEstimate()
