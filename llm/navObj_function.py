@@ -114,7 +114,7 @@ class ToolSurroundingDetect(ToolBase):
         return {
             "type": "function",
             "function": {
-                "name": "surround_detect",
+                "name": "surrounding_detect",
                 "description": "This `surround_detect` function represents detecting the surroundings of a "
                                "specific object.",
                 "parameters": {
@@ -146,7 +146,16 @@ class ToolInterestpointGet(ToolBase):
             if param not in args:
                 raise Exception("parameter '{}' not found in the arguments {}.".format(param, args))
 
-        return args.get("landmark"), args.get("coord_x"), args.get("coord_y")
+        coord_x = args.get("coord_x")
+        coord_y = args.get("coord_y")
+
+        try:
+            coord_x = float(coord_x)
+            coord_y = float(coord_y)
+        except ValueError:
+            raise Exception("coord_x and coord_y must be convertible to float.")
+
+        return args.get("landmark"), coord_x, coord_y
 
     def execute(self, task: Task, args_str: str):
         landmark, coord_x, coord_y = self.parser(args_str)
@@ -180,11 +189,11 @@ class ToolInterestpointGet(ToolBase):
         return {
             "type": "function",
             "function": {
-                "name": "viewpoint_get",
-                "description": "This `viewpoint_get` function represents get the next accessible viewpoint on the "
+                "name": "interestpoint_get",
+                "description": "This `interestpoint_get` function represents get the next accessible viewpoint on the "
                                "topology map.",
                 "parameters": {
-                    "type": "viewpoint",
+                    "type": "object",
                     "properties": {
                         "landmark": {
                             "type": "string",

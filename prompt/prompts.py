@@ -11,9 +11,14 @@ SYSTEM_PRINCIPLE = """Here are some tips for you to finish point navigation. Not
 time. In this case, landmark refers to a variety of objects such as cabinet, bag, etc. Try to extract the object from 
 the instructions.
 
-When you try to go to the landmark, please capture the surrounding first. When taking pictures of your surroundings, 
-you will only use one camera at a time, so you need to give rotate_degree, The rotation angle should be selected in 
-order 0, 90, 180, 270, 360.
+Remember all the objects in the instruction are landmarks.
+
+Note that you can perform two tasks PointNav and ObjNav, when you perform PointNav there will be some viewpoints in 
+the scene for you to navigate, and you need to find the most appropriate viewpoint; but when you perform ObjNav, 
+you don't have these viewpoints, you will get the coordinate points of the objects on the radar, and then you need to 
+utilize the Then you need to use the transform function to transform them into points on the map to perform navigation.
+
+When the instructions require you to look for a variety of things, look for them piece by piece, do not ignore any one.
 
 pipeline of the system
 ---
@@ -21,63 +26,25 @@ pipeline of the system
 STEP 1: **surrounding_detect**  
 Using the surrounding_detect function to capture a photo and detect the landmark init. When you find it go to Step 2.
 
-STEP: **viewpoint_get**  
+STEP: **viewpoint_get**  or **interestpoint_get**
 Using the system’s map and past trajectory, find the closest connected viewpoint ID relative to the current viewpoint, suitable for further navigation.
 
 **STEP 4**: **Navigate to viewpoint**  
 Navigate to the identified viewpoint from **STEP 3**.
 
 If you think you have finished the task, please output exit.
----
-
 """
 
-NavPoint_simple_prompt = ''' Instruct: Starting from viewpoint(0915e34d-80cb-4a0a-808a-8c9793e052d2), go out to the door and turn left, forward to the whiteboard and stop at the it.
-> think: To follow the instructions, I should take photos to understand surroundings to find a door
-OK.
-> Tool calls: detect_surroundings()
-I have scan the surroundings and get photos at the viewpoint(0915e34d-80cb-4a0a-808a-8c9793e052d2)
-> think: Now, I need to find the door and get its depth.
-OK.
-> Tool calls: depth_estimate('door')
-The depth is 5m away, and the coordinates of the door in the world coordinate is about x=1.5, y=1.5. The door is appear in the first image. So I do not need to rotate to correct my pose. I need to find the next optimum viewpoints.
-> Tool calls: find_viewpoint(0915e34d-80cb-4a0a-808a-8c9793e052d2, 1.5, 1.23)
-The proper viewpoint is xvcbbgfdgf1.
-> Tool calls: navigate(lknvm1sffdh, lknvm1sffdh, NO_CHANGED_POSE)
-You are arrive at (lknvm1sffdh) with current pose.
-> think: Okay, I have found a door in the first photo, so do not need to rotate and the door is about 2.5 meters away, the coordinates of the door in the world coordinate is about x=1.5, y=1.23.
-OK.
+COT_PROMPT = """Here are some examples for you to get a better description of your task.
+EXAMPLE INSTRUCTION 1: You are at point ajfklajslfka with pose 0, Your task is: go to the countertop and go to table and then stop at the fridge.
+Your output should be: I am at ajfklajslfka with pose 0. To finish the task, I should go to the countertop and go to table. After I go to table, I should then go to  a fridge and stop at the it.
+EXAMPLE INSTRUCTION 2: You are at point nvmnv12 with pose 120. Your task is: go to the desk and go to a computer and stop at the red wall.
+Your output should be: I am at nvmnv12 with pose 120. To finish the task, I should go to the desk and go to  a computer. After I go to a computer, I should find a red wall and stop at the it.
+"""
 
-> think: Okay. I should go there.
-OK.
-> Tool calls: navigate(lknvm1sffdh, xvcbbgfdgf1, NO_CHANGED_POSE)
-You are arrive at (xvcbbgfdgf1) with current pose.
-> think: Okay, after go out of the door, I need to turn left.
-OK.
-> Tool calls: navigate(xvcbbgfdgf1, xvcbbgfdgf1, TURN_LEFT, 90) 
-you are arrive at (xvcbbgfdgf1) meanwhile turn left 90 degrees.
-> think: I have turned right, now I need to detect surroundings to find a whiteboard.
-Ok.
-> Tool calls: detect_surroundings(whiteboard)
-There is a whiteboard in the fourth photo, so I need to rotate 90 to right. And the door is about 3 meters away, the coordinates of the door in the world coordinate is about x=-3.7 , y=4.
-> think: I need to get back to the pose I had when I took the fourth picture, I need to turn left 90 degree.
-OK.
-> Tool calls: navigate(xvcbbgfdgf1, xvcbbgfdgf1, TURN_LEFT, 90)
-You are arrive at (xvcbbgfdgf1) meanwhile turn left 90 degrees.
-> think: okay, I have found the whiteboard, and the door is about 3 meters away, the coordinates of the door in the world coordinate is about x=-3.7 , y=4.
-OK.
-> think Okay, now I need to find the closet viewpoint.
-OK.
-> Tool calls: find_viewpoint(xvcbbgfdgf1, 3.7, 4)
-The proper viewpoint is xcbvn1.
-> think: Okay. I should go there.
-OK.
-> Tool calls: navigate(xvcbbgfdgf1, xcbvn1, no_changed_pose)
-You are arrive at (xcbvn1) with current pose.
-> think: Okay, I have already been near the whiteboard. Lets me think whether I am close enough.
-OK.
-> Tool calls: detect_surroundings(whiteboard) 
-There is a whiteboard in the first photo, and the depth of the white board is 0.5m. he coordinates of the door in the world coordinate is about x=-3.7 , y=4.
-> think: Okay, I am close enough. Task Completed.
-OK.
-'''
+SUMMARY_PROMPT = """Here you need to summarize your past tool call records and task goals. I've omitted some of the content please focus on the landmark.
+EXAMPLE INSTRUCTION 1: system: ALGORITHM PIPELINE. Your task: I am at ajfklajslfka with pose 0. To finish the task, I should go to the countertop and find a plastic bag. After I found the plastic bag, I should find a fridge and stop at the it. TOOL CALL MESSAGE. landmark countertop. Navigate vzxvz or 1.31 2.22
+Your output should be: I am at vzxvzt or 1.31 2.22 with pose 90 and I have found and navigate to the countertop. Now I need to find a plastic bag. And then I need to find a fridge and stop at the it.
+EXAMPLE INSTRUCTION 2: system: ALGORITHM PIPELINE. Your task: I am at nvmnv12 with pose 120. To finish the task, I should go to the desk and find a pen. After I found the pen, I should find a red wall and stop at the it. TOOL CALL MESSAGE. landmark countertop. Navigate cvbxnbm or 1.26 2.45
+Your output should be: I am at cvbxnbm or 1.26 2.45 and I have found and navigate to the desk. After I found the pen, I should find a red wall and stop at the it.
+"""

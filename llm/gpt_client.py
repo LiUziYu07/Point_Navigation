@@ -1,5 +1,5 @@
 from nav_manager import ToolManager
-from prompt.prompts import SYSTEM_PRINCIPLE
+from prompt.prompts import SYSTEM_PRINCIPLE, COT_PROMPT, SUMMARY_PROMPT
 import openai
 import uuid
 
@@ -43,6 +43,18 @@ class GPTClient():
             }
         )
 
+    def add_cot_message(self, task_description, prompt):
+        self.messages = []
+        self.add_message("system", self.sys_msgs + "\n" + prompt)
+        self.add_message("system", "Your task: {}".format(task_description))
+
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=self.messages
+        )
+        print(f"COT LLM Output: {response.choices[0].message.content}")
+        self.reset_task_message(response.choices[0].message.content)
+
     def execute(self):
         try:
             response = openai.chat.completions.create(
@@ -58,7 +70,8 @@ class GPTClient():
                 for idx, tool_call in enumerate(response.choices[0].message.tool_calls):
                     if idx > 0:
                         self.add_tool_message(
-                            tool_call.id, function_name, "This is an extra tool call. It would not be executed. Please try again later."
+                            tool_call.id, function_name,
+                            "This is an extra tool call. It would not be executed. Please try again later."
                         )
                         print(
                             "robot call tools id {}\nfunc: {}\nargs: {}\nresp: {}".format(
@@ -71,9 +84,8 @@ class GPTClient():
                         continue
                     function_name = tool_call.function.name
                     function_args = tool_call.function.arguments
-                    function_response = self.tool_manager.execute(tool_name=function_name, tool_args=function_args, task=self.task)
-                    # if "navigate" in function_name:
-                    #     self.update_task_message(function_response)
+                    function_response = self.tool_manager.execute(tool_name=function_name, tool_args=function_args,
+                                                                  task=self.task)
                     print(
                         "robot call tools id {}\nfunc: {}\nargs: {}\nresp: {}".format(
                             tool_call.id,
@@ -103,25 +115,23 @@ class GPTClient():
         self.add_message("system", "Your task: {}".format(self.task_description))
 
     def test(self):
-        task = ""
+        task = input("Your task: ")
         feedback = ""
+        # task = "go to the cabinet and try to find a green bag and go to green bag first, at last try to find a stop sign and stop there."
+        self.add_cot_message(
+            f"task: {task}" + f"the type of your task is: {self.task_type}" + f"\nYour current state is:\t{self.task.cur_node.node_id}",
+            COT_PROMPT)
         while task != "exit" and feedback != "exit":
-            # task = input("Your task: ")
-            task = "go to the cabinet and try to find a green bag, after that you should get there and take photos."
-            self.reset_task_message(task + f"\nYour current point id is:\t{self.task.cur_node.node_id}")
-            while task != "exit" and feedback != "exit":
-                response = self.execute()
-                feedback = input("Whether or not to continue? (y/n): ")
-                if feedback == "n" or 'exit' in response:
-                    print("session reset")
-                    break
-            break
-        pass
+            response = self.execute()
+            feedback = input("Whether or not to continue? (y/n): ")
+            if feedback == "n" or 'exit' in response:
+                print("session reset")
+                break
 
 
 if __name__ == "__main__":
     task_id = uuid.uuid4()
-    task_type = "PointNav"
+    task_type = "ObjNav"
     episode = init_pointNavTask(task_id, "ObjPointNav_trial_1", "INIT", "",
                                 coordinates, node_infos, connection_matrix, uuid2timestamp)
     episode.test()

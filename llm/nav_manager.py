@@ -1,5 +1,6 @@
-from navPoint_function import ToolNavigate as PointNavigate, ToolViewpointGet, ToolSurroundingDetect
-from core.task import PointNav
+from navPoint_function import ToolNavigate as PointNavigate, ToolViewpointGet, ToolSurroundingDetect as PointNavDetect
+from navObj_function import ToolNavigate as ObjNavigate, ToolInterestpointGet, ToolSurroundingDetect as ObjNavDetect
+from core.task import Task, PointNav
 from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 
 
@@ -11,14 +12,23 @@ class ToolManager:
 
     def generate_tools_dict(self):
         # 根据 task_type 生成工具字典
-        tools = {
-            'surrounding_detect': ToolSurroundingDetect(),
-            'navigate': PointNavigate(),
-            'viewpoint_get': ToolViewpointGet(),
-        }
+        if self.task_type == 'PointNav':
+            tools = {
+                'surrounding_detect': PointNavDetect(),
+                'navigate': PointNavigate(),
+                'viewpoint_get': ToolViewpointGet(),
+            }
+        elif self.task_type == 'ObjNav':
+            tools = {
+                'surrounding_detect': ObjNavDetect(),
+                'navigate': ObjNavigate(),
+                'interestpoint_get': ToolInterestpointGet(),
+            }
+        else:
+            raise Exception('Task type not supported')
         self.tool_dict = tools
 
-    def execute(self, tool_name: str, tool_args: dict, task: str = None):
+    def execute(self, tool_name: str, tool_args: dict, task: Task = None):
         # 优化的工具执行方法
         try:
             tool = self.tool_dict.get(tool_name)
