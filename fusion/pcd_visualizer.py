@@ -67,5 +67,5 @@ def visualize_pcd_with_camera(file_path: str, camera_position=(0, 0, 5), zoom=0.
 
 if __name__ == "__main__":
     # 替换为你的 PCD 文件路径
-    file_path = "D:\\CEG5003_PointNav\\data\\obs\\tracer_pcd\\1730128062\\1730128062.pcd"
+    file_path = "D:\\CEG5003_PointNav\\data\\outdated\\tracer_pcd\\1731161620\\1731161620.pcd"
     visualize_pcd_with_camera(file_path, camera_position=(0, -1, 1), z_threshold=0.01)

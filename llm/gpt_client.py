@@ -1,9 +1,9 @@
-from nav_manager import ToolManager
+from llm.nav_manager import ToolManager
 from prompt.prompts import SYSTEM_PRINCIPLE, COT_PROMPT, SUMMARY_PROMPT
 import openai
 import uuid
 
-from core.task import Task, init_pointNavTask
+from core.task import Task, PointNav
 from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 from config.api import GPT_MODEL
 
@@ -117,7 +117,6 @@ class GPTClient():
     def test(self):
         task = input("Your task: ")
         feedback = ""
-        # task = "go to the cabinet and try to find a green bag and go to green bag first, at last try to find a stop sign and stop there."
         self.add_cot_message(
             f"task: {task}" + f"the type of your task is: {self.task_type}" + f"\nYour current state is:\t{self.task.cur_node.node_id}",
             COT_PROMPT)
@@ -128,11 +127,26 @@ class GPTClient():
                 print("session reset")
                 break
 
+    def run(self, instructions, human_intervene=False):
+        self.add_cot_message(
+            f"task: {instructions}" + f"the type of your task is: {self.task_type}" + f"\nYour current state is:\t{self.task.cur_node.node_id}",
+            COT_PROMPT)
+        feedback = ""
+        for i in range(15):
+            response = self.execute()
+            if 'exit' in response:
+                break
+            if human_intervene:
+                feedback = input("Whether or not to continue? (y/n): ")
+            if feedback == "n" or 'exit' in response:
+                print("session reset")
+                break
+
 
 if __name__ == "__main__":
     task_id = uuid.uuid4()
     task_type = "ObjNav"
-    episode = init_pointNavTask(task_id, "ObjPointNav_trial_1", "INIT", "",
+    episode = PointNav(task_id, "ObjPointNav_trial_1", "", "INIT",
                                 coordinates, node_infos, connection_matrix, uuid2timestamp)
     episode.test()
     client = GPTClient(task=episode, task_type=task_type, model=GPT_MODEL, sys_msgs=SYSTEM_PRINCIPLE)

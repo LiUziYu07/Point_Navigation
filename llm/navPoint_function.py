@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 
 from download.ssh import download_folders
 from fusion.get_depth import run as run_depth_service
-from core.task import Task, PointNav, init_pointNavTask
+from core.task import Task, PointNav
 from config.ros import ROS_IP, ROS_PORT, ROS_IMAGE_PTH, ROS_JSON_PTH, ROS_PCD_PTH, ROS_HOST_NAME
 from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 from utils.robot_requests import send_post_request, url_dict
@@ -390,7 +390,7 @@ class ToolNavigate(ToolBase):
 if __name__ == "__main__":
     task_id = uuid.uuid4()
 
-    episode = init_pointNavTask(task_id, "Point2PointNav_trial_1", "INIT", "",
+    episode = PointNav(task_id, "Point2PointNav_trial_1", "INIT", "",
                                 coordinates, node_infos, connection_matrix, uuid2timestamp)
     episode.test()
     print(episode.cur_node)

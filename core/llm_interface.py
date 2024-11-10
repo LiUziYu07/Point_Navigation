@@ -16,9 +16,7 @@ def recognize_intention(user_input, model="llama"):
         response = process_input(formatted_input)
     else:
         response = generate_text_from_text(formatted_input)
-    # print(f"Original Response: {response}")
     response = re.search(r'\{(.*?)\}', response).group(0)
-    # print(f"Clip Response: {response}")
 
     try:
         response_json = json.loads(response)
@@ -92,9 +90,9 @@ def format_chat_history(chat_history):
     formatted_history = ""
     for message in chat_history:
         if message['role'] == 'user':
-            formatted_history += f"用户: {message['content']}\n"
+            formatted_history += f"User: {message['content']}\n"
         elif message['role'] == 'assistant':
-            formatted_history += f"模型: {message['content']}\n"
+            formatted_history += f"Model: {message['content']}\n"
     return formatted_history
 
 

@@ -6,6 +6,7 @@ url_dict = {
     "camera": f"http://{ROS_IP}:{ROS_PORT}/camera?id=123",
     "navigate": f"http://{ROS_IP}:{ROS_PORT}/navigate?id=123",
     "transform": f"http://{ROS_IP}:{ROS_PORT}/transform?id=123",
+    "plan": f"http://{ROS_IP}:{ROS_PORT}/plan?id=123",
 }
 
 

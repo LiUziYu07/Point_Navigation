@@ -137,11 +137,6 @@ class PointNav(Task):
         return f"PointNav Task ID: {self.task_id}, Description: {self.description}, Status: {self.status}, Instructions: {self.instructions}, Viewpoints: {len(self.viewpoints.keys())}"
 
 
-def init_pointNavTask(task_id, description, status, instructions, coordinates, node_infos, connection_matrix, uuid2timestamp):
-    episode = PointNav(task_id, description, instructions, status, coordinates, node_infos, connection_matrix, uuid2timestamp)
-    return episode
-
-
 if __name__ == "__main__":
     task = PointNav(1, "Point2PointNav", "Go out and see a walkway, then turn right toward the door", "IN_PROGRESS",
                     coordinates, node_infos, connection_matrix)

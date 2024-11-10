@@ -1,5 +1,5 @@
-from navPoint_function import ToolNavigate as PointNavigate, ToolViewpointGet, ToolSurroundingDetect as PointNavDetect
-from navObj_function import ToolNavigate as ObjNavigate, ToolInterestpointGet, ToolSurroundingDetect as ObjNavDetect
+from llm.navPoint_function import ToolNavigate as PointNavigate, ToolViewpointGet, ToolSurroundingDetect as PointNavDetect
+from llm.navObj_function import ToolNavigate as ObjNavigate, ToolInterestpointGet, ToolSurroundingDetect as ObjNavDetect
 from core.task import Task, PointNav
 from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 

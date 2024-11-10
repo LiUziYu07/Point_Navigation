@@ -20,16 +20,17 @@ utilize the Then you need to use the transform function to transform them into p
 
 When the instructions require you to look for a variety of things, look for them piece by piece, do not ignore any one.
 
-pipeline of the system
+pipeline of the system (Do not forget any steps)
 ---
 
 STEP 1: **surrounding_detect**  
 Using the surrounding_detect function to capture a photo and detect the landmark init. When you find it go to Step 2.
 
 STEP: **viewpoint_get**  or **interestpoint_get**
-Using the system’s map and past trajectory, find the closest connected viewpoint ID relative to the current viewpoint, suitable for further navigation.
+For viewpoint_get, Using the system’s map and past trajectory, find the closest connected viewpoint ID relative to the current viewpoint, suitable for further navigation.
+For interestpoint_get, Using the depth of the target object, find the closest connected coordinates on the map, suitable for further navigation.
 
-**STEP 4**: **Navigate to viewpoint**  
+**STEP 4**: **Navigate to viewpoint**  Note that you need to use coordinates on the map
 Navigate to the identified viewpoint from **STEP 3**.
 
 If you think you have finished the task, please output exit.
@@ -43,7 +44,7 @@ Your output should be: I am at nvmnv12 with pose 120. To finish the task, I shou
 """
 
 SUMMARY_PROMPT = """Here you need to summarize your past tool call records and task goals. I've omitted some of the content please focus on the landmark.
-EXAMPLE INSTRUCTION 1: system: ALGORITHM PIPELINE. Your task: I am at ajfklajslfka with pose 0. To finish the task, I should go to the countertop and find a plastic bag. After I found the plastic bag, I should find a fridge and stop at the it. TOOL CALL MESSAGE. landmark countertop. Navigate vzxvz or 1.31 2.22
+EXAMPLE INSTRUCTION 1: system: ALGORITHM PIPELINE. Your task: I am at ajfklajslfka with pose 0. To finish the task, I should go to the countertop and find a plastic bag. After I found the plastic bag, I should go there. Then I should find a fridge and get there. TOOL CALL MESSAGE. landmark countertop. Navigate vzxvz or 1.31 2.22
 Your output should be: I am at vzxvzt or 1.31 2.22 with pose 90 and I have found and navigate to the countertop. Now I need to find a plastic bag. And then I need to find a fridge and stop at the it.
 EXAMPLE INSTRUCTION 2: system: ALGORITHM PIPELINE. Your task: I am at nvmnv12 with pose 120. To finish the task, I should go to the desk and find a pen. After I found the pen, I should find a red wall and stop at the it. TOOL CALL MESSAGE. landmark countertop. Navigate cvbxnbm or 1.26 2.45
 Your output should be: I am at cvbxnbm or 1.26 2.45 and I have found and navigate to the desk. After I found the pen, I should find a red wall and stop at the it.

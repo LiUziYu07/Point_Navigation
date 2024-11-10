@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 from graph.node import Node
 from download.ssh import download_folders
 from fusion.get_depth import run as run_depth_service
-from core.task import Task, PointNav, init_pointNavTask
+from core.task import Task, PointNav
 from config.ros import ROS_IP, ROS_PORT, ROS_IMAGE_PTH, ROS_JSON_PTH, ROS_PCD_PTH, ROS_HOST_NAME
 from config.nav_node_info import coordinates, node_infos, connection_matrix, uuid2timestamp
 from utils.robot_requests import send_post_request, url_dict
@@ -171,17 +171,70 @@ class ToolInterestpointGet(ToolBase):
         new_x = coord_x - self.threshold * unit_x
         new_y = coord_y - self.threshold * unit_y
 
-        point_data = {
-            "point_x": new_x,
-            "point_y": new_y,
-            "point_z": 0,
+        print(f"new_x: {new_x}, new_y: {new_y}, dist: {dist}, coord_x: {coord_x}, coord_y: {coord_y}")
+        
+        step_size = 0.4
+        
+        navigate_x, navigate_y = None, None
+        sign_x = 1 if new_x > 0 else -1
+        sign_y = 1 if new_y > 0 else -1
+        
+        print(f"sign_x: {sign_x}, sign_y: {sign_y}, new_x: {new_x}, new_y: {new_y}")
+
+        # First, test if new_x can be navigated
+        lidar_data_x = {
+            "goal_x": str(new_x),
+            "goal_y": str(new_y),
+            "goal_z": "0",
+            "rotate_degree": 0
         }
-        transform_response = send_post_request("transform", point_data)
-        print(f"Point on the map: {transform_response.text}")
-        if transform_response.status_code == 200:
-            print(f"Point on the map: {transform_response.text}")
+        print(f"Testing new_x: {new_x}, new_y: {new_y}")
+        lidar_response_x = send_post_request("plan", lidar_data_x)
+
+        if lidar_response_x.status_code == 200 and "true" in lidar_response_x.text.lower():
+            print(f"\033[94mFound accessible point at new_x: {new_x}, new_y: {new_y}\033[0m")
+            navigate_x, navigate_y = new_x, new_y
         else:
-            print("Error in transformation ")
+            print(f"\033[91mnew_x: {new_x}, new_y: {new_y} is not accessible, proceeding with step adjustments\033[0m")
+            while sign_x * new_x > 0:
+                navigate_x = -sign_x * step_size + new_x
+                
+                cur_y = new_y
+                print(f"cur_y: {cur_y}, sign_y: {sign_y}")
+                while sign_y * cur_y > 0:
+                    navigate_y = -sign_y * step_size + cur_y
+                    
+                    lidar_data = {
+                    "goal_x": str(navigate_x),
+                    "goal_y": str(navigate_y),
+                    "goal_z": "0",
+                    "rotate_degree": 0
+                    }
+                    print(f"Checking navigate_x: {navigate_x}, navigate_y: {navigate_y}")
+                    lidar_response = send_post_request("plan", lidar_data)
+                    
+                    cur_y = navigate_y
+
+                new_x = navigate_x
+                if lidar_response.status_code == 200 and "true" in lidar_response.text.lower():
+                    print(f"\033[94mFound accessible point: {navigate_x}, {navigate_y}\033[0m")
+                    break
+                else:
+                    print(f"\033[91mNot accessible point: {navigate_x}, {navigate_y}\033[0m")
+                    continue
+        if navigate_x and navigate_y:
+            point_data = {
+                "point_x": navigate_x,
+                "point_y": navigate_y,
+                "point_z": 0,
+            }
+            transform_response = send_post_request("transform", point_data)
+            if transform_response.status_code == 200:
+                print(f"Point on the map: {transform_response.text}")
+            else:
+                print("Error in transformation ")
+        else:
+            return "there is no accessible point for the landmark."
 
         return transform_response.text
 
@@ -326,12 +379,12 @@ class ToolNavigate(ToolBase):
                     "properties": {
                         "coord_x": {
                             "type": "string",
-                            "description": "coord_x represents the x coordinate of the destination position of the robot's "
+                            "description": "coord_x represents the x coordinate of the destination position on the map of the robot's "
                                            "navigation",
                         },
                         "coord_y": {
                             "type": "string",
-                            "description": "coord_y represents the y coordinate of the destination position of the robot's "
+                            "description": "coord_y represents the y coordinate of the destination position on the map of the robot's "
                                            "navigation",
                         },
                         "rotate_degree": {
@@ -348,7 +401,7 @@ class ToolNavigate(ToolBase):
 
 if __name__ == "__main__":
     task_id = uuid.uuid4()
-    episode = init_pointNavTask(task_id, "ObjPointNav_trial_1", "INIT", "",
+    episode = PointNav(task_id, "ObjPointNav_trial_1",  "", "INIT",
                                 coordinates, node_infos, connection_matrix, uuid2timestamp)
     episode.test()
 
