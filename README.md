@@ -76,3 +76,8 @@
 ```bash
 pip install -r requirements.txt
 ```
+
+## 第三方依赖
+https://github.com/facebookresearch/segment-anything
+https://github.com/IDEA-Research/GroundingDINO
+https://github.com/cvlab-epfl/disk
