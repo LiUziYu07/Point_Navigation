@@ -3,7 +3,6 @@
 data/outdated/*
 
 # 忽略所有 .yaml 和 .json 文件
-*.yaml
 *.json
 
 # 忽略outdated

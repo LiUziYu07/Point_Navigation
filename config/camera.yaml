@@ -1,0 +1,12 @@
+intrinsic_matrix:
+  focal_length_x: 415.2405
+  focal_length_y: 416.0930
+  center_x: 629.6892
+  center_y: 340.6051
+  distort_type: non_fisheye
+
+distort_param:
+  k1: -0.070874
+  k2: 0.057968
+  p1: -0.001135
+  p2: 0.000292
