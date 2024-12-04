@@ -1,8 +1,4 @@
 *.pth
-# 忽略 data 文件夹中的所有内容，但保留目录结构
+# 忽略outdated
 data/outdated/*
 
-# 忽略所有 .yaml 和 .json 文件
-*.json
-
-# 忽略outdated
