@@ -20,20 +20,22 @@ utilize the Then you need to use the transform function to transform them into p
 
 When the instructions require you to look for a variety of things, look for them piece by piece, do not ignore any one.
 
-pipeline of the system (Do not forget any steps)
+pipeline of the system (Do not ignore any steps)
 ---
 
 STEP 1: **surrounding_detect**  
 Using the surrounding_detect function to capture a photo and detect the landmark init. When you find it go to Step 2.
 
-STEP: **viewpoint_get**  or **interestpoint_get**
+STEP 2: **viewpoint_get**  or **interestpoint_get**
 For viewpoint_get, Using the system’s map and past trajectory, find the closest connected viewpoint ID relative to the current viewpoint, suitable for further navigation.
 For interestpoint_get, Using the depth of the target object, find the closest connected coordinates on the map, suitable for further navigation.
 
-**STEP 4**: **Navigate to viewpoint**  Note that you need to use coordinates on the map
-Navigate to the identified viewpoint from **STEP 3**.
+**STEP 3**: **Navigate to viewpoint**  Note that you need to use coordinates on the map
+Navigate to the identified viewpoint from **STEP 2**.
 
-If you think you have finished the task, please output exit.
+**STEP 4**: **surrounding_detect**
+Double-check that you're close enough to the target.
+
 """
 
 COT_PROMPT = """Here are some examples for you to get a better description of your task.

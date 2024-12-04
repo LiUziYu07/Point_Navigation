@@ -1,12 +1,9 @@
 *.pth
 # 忽略 data 文件夹中的所有内容，但保留目录结构
-data/*
-!data/.gitkeep
+data/outdated/*
 
 # 忽略所有 .yaml 和 .json 文件
 *.yaml
 *.json
 
-# 忽略 config 文件夹中的所有内容
-config/*
-!config/.gitkeep
+# 忽略outdated
